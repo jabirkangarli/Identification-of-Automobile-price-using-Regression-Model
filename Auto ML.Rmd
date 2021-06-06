@@ -1,0 +1,349 @@
+---
+title: "Identification of Automobile price using Regression Model "
+author: "Jabir Kangarli"
+date: ""
+subtitle: 
+output:
+  pdf_document:
+    fig_caption: yes
+---
+
+\centering
+
+\raggedright
+
+\abstract
+
+In the analysis, the objective of the analysis helps us to understand each variable and its effect on the dependent variable. Predictive modeling and its output will be performed using linear regression and trying to understand the performance of the linear regression model using RMSE, R^2, and other metrics 
+
+
+\newpage  
+
+\tableofcontents
+
+\newpage
+
+# Introduction 
+
+The analysis involves 2 parts. i.e data analysis and machine learning. In data analysis, all 26 features will be analyzed along with their dependency on the dependent variable.
+
+## About Data
+
+This dataset consists of data From 1985 Ward's Automotive Yearbook. Here are the sources
+
+## Sources
+
+1) 1985 Model Import Car and Truck Specifications, 1985 Ward's Automotive Yearbook.
+2) Personal Auto Manuals, Insurance Services Office, 160 Water Street, New York, NY 10038
+3) Insurance Collision Report, Insurance Institute for Highway Safety, Watergate 600, Washington, DC 20037
+
+## Content
+
+This data set consists of three types of entities: (a) the specification of an auto in terms of various characteristics, (b) its assigned insurance risk rating, (c) its normalized losses in use as compared to other cars. The second rating corresponds to the degree to which the auto is riskier than its price indicates. Cars are initially assigned a risk factor symbol associated with their price. Then, if it is riskier (or less), this symbol is adjusted by moving it up (or down) the scale. Actuarians call this process "symboling". A value of +3 indicates that the auto is risky, -3 that it is probably pretty safe.
+
+The third factor is the relative average loss payment per insured vehicle year. This value is normalized for all autos within a particular size classification (two-door small, station wagons, sports/specialty, etc…), and represents the average loss per car per year.
+
+## Objective of the Study
+
+In the Analysis, we can find how each variable is affecting the output i.e price and using these variables how can create a predictive model.
+
+## Overview of the Data
+
+The Data consists of 205 rows and 26 variables out of which there are 25 independent variables and the rest are dependent variables. 
+
+we can see the head of the data below:
+
+```{r,echo=FALSE}
+if(!"pacman" %in% installed.packages()[,"Package"]) install.packages("pacman")
+pacman::p_load(dplyr,MASS,randomForest,
+               RColorBrewer,ggplot2,caret,psych)
+df <- read.csv("C:\\Users\\jabirk\\Documents\\db\\Auto_data.csv")
+head(df)
+```
+most of the variable here are either categorical, numeric or integer we can view the data structure below:
+
+```{r,echo=FALSE}
+str(df)
+```
+
+\newpage
+
+# Data Analysis
+
+As the data is been divided into 205 rows and 26 columns. There is a necessity for understanding the data. As the column normalized.losses has an observation called "?" and which is a possible data not captured. Treatment needs to be performed. 
+
+## Data Cleaning 
+
+The column needs to be inspected before performing any transformation
+
+```{r,echo=FALSE}
+table(df$normalized.losses)
+```
+
+As per the above observation, there are 41 variables with "?". Similarly, there are "?" in bore, stroke, and horsepower, peak.rpm, price, and normalized.losses. We replace all "?" to NA.  
+
+```{r,echo=FALSE}
+df$bore[df$bore == "?"] <- NA
+df$stroke[df$stroke == "?"] <- NA
+df$horsepower[df$horsepower == "?"] <- NA
+df$peak.rpm[df$peak.rpm == "?"] <- NA
+df$price[df$price == "?"] <- NA
+df$normalized.losses[df$normalized.losses == "?"] <- NA
+df$num.of.doors[df$num.of.doors == "?"]<- NA
+```
+
+The column and its null values can be seen below:
+```{r,echo=FALSE}
+colSums(is.na(df))
+```
+
+The data imputation can be performed with the imputation of mean, median, and mode. For categorical data, mode can be a stable imputation and for continuous data mean can be a better option. After imputation, there are no null values in the data which can be observed below
+
+
+```{r,echo=FALSE}
+
+#df$x[is.na(df$x)]<-mean(df$x,na.rm=TRUE)
+df$num.of.doors[is.na(df$num.of.doors)] <- "four"
+# impute normalized.losses
+df$normalized.losses<-sapply(df$normalized.losses, function(x) as.numeric(as.character(x)))
+df$normalized.losses[is.na(df$normalized.losses)] <- mean(df$normalized.losses,na.rm=TRUE)
+
+# impute bore
+
+df$bore<-sapply(df$bore, function(x) as.numeric(as.character(x)))
+df$bore[is.na(df$bore)] <- mean(df$bore,na.rm=TRUE)
+
+# impute stroke
+
+df$stroke<-sapply(df$stroke, function(x) as.numeric(as.character(x)))
+df$stroke[is.na(df$stroke)] <- mean(df$stroke,na.rm=TRUE)
+
+# imputing rpm
+
+df$peak.rpm<-sapply(df$peak.rpm, function(x) as.numeric(as.character(x)))
+df$peak.rpm[is.na(df$peak.rpm)] <- mean(df$peak.rpm,na.rm=TRUE)
+
+# imputing hp
+
+df$horsepower<-sapply(df$horsepower, function(x) as.numeric(as.character(x)))
+df$horsepower[is.na(df$horsepower)] <- mean(df$horsepower,na.rm=TRUE)
+
+# impute price
+
+df$price<-sapply(df$price, function(x) as.numeric(as.character(x)))
+df$price[is.na(df$price)] <- mean(df$price,na.rm=TRUE)
+
+```
+```{r,echo=FALSE}
+colSums(is.na(df))
+```
+
+As per the above observation, all the NAs are imputed and the data is available for further steps. 
+
+\  
+
+## Discriptive Analysis
+\ 
+As the data has been imported and imputed there is a necessity to understand the variables in the data. 
+
+A package called "psych" is used to perform analysis over the data which provides a descriptive analysis of each variable in the data.
+
+```{r,echo=FALSE}
+describe(df)
+```
+
+As per the above observation, we can see the key information of each variable in the data is shown above. It contains information like the number of variables, an average of variables, standard deviation, median, trimmed mean, mad, min, max, range, skewness, and kurtosis. We can see that the variables like symboling, make, fuel type, body style, and drive wheels have negative skewness. And none of the variables are normally distributed. There is a necessity to bring all the variables into normally distributed variables before applying any linear models.
+Now we will try to understand how independent variables are affecting the dependent variables using EDA. Wherein the price is the dependent variable and all the other variables are the dependent one. 
+
+
+## Feature Analysis
+There are nearly X variables in the data, so there is a necessity to identify the most significant variables contributing to the price.
+
+### Fuel Type vs Price
+In this analysis, the fuel type and its effect on the price is analyzed using visualization.
+
+```{r,echo=FALSE}
+df %>%  ggplot(aes(x= fuel.type,y=price,fill=fuel.type)) + geom_boxplot() +  xlab("Fuel Type") + ylab("Price")+ ggtitle("Fuel Type vs Price")
+```
+As per the above visualization. Diesel tends to fetch a higher price than petrol. But petrol cars have many outlines which exceed the diesel price
+
+### Engine Type vs Price
+
+There are 7 types of engine and each has its own pricing system.
+
+
+```{r,echo=FALSE}
+df %>%  ggplot(aes(x= engine.type,y=price,fill=engine.type)) + geom_boxplot() +  xlab("engine.type") + ylab("Price")+ ggtitle("engine.type vs Price")
+```
+
+Out of all the different types of engines, "ohcv" is one such engine time that has the highest price, and "ohcf" has the lowest price compared to all.  
+
+### Engine Size vs Price
+
+All the engines do not come with standard size and they range from 61 to 326. Out of which we have considered the mean price of the engine to see the relationship.
+
+```{r,echo=FALSE}
+ndf<-df %>% group_by(as.factor(engine.size)) %>% summarise(Mean_Price = mean(price))
+colnames(ndf)<- c("engine.size", "Mean_Price" )
+ndf %>%  ggplot(aes(x=engine.size ,y=Mean_Price,group = 1)) + geom_line() +  xlab("engine.size ") + ylab("Mean Price")+ ggtitle("Engine Size  vs Mean Price")+theme(axis.text.x = element_text(angle = 90))
+```
+
+As per the above observation, it can be seen that there is an exponential growth in the relationship between price and engine size.
+
+### Peak RPM vs Price
+
+Similarly to engine size, rpm ranges from 4150 to 6600. A mean price is considered to analyze the same as before
+
+```{r,echo=FALSE}
+ndf<-df %>% group_by(as.factor(round(peak.rpm))) %>% summarise(Mean_Price = mean(price))
+colnames(ndf)<- c("peak.rpm", "Mean_Price" )
+ndf %>%  ggplot(aes(x=peak.rpm ,y=Mean_Price,group = 1)) + geom_line() +  xlab("peak.rpm ") + ylab("Mean Price")+ ggtitle(" Peak RPM  vs Mean Price")+theme(axis.text.x = element_text(angle = 90))
+
+```
+
+RPM do not have a specific trend but some of the rpm are significant
+
+### Car Width and Price
+
+Car width is another feature which has the range between 60 to 72. 
+
+```{r,echo=FALSE}
+ndf<-df %>% group_by(as.factor(round(width))) %>% summarise(Mean_Price = mean(price))
+colnames(ndf)<- c("width", "Mean_Price" )
+ndf %>%  ggplot(aes(x=width ,y=Mean_Price,group = 1)) + geom_line() +  xlab("width") + ylab("Mean Price")+ ggtitle("width  vs Mean Price")+theme(axis.text.x = element_text(angle = 90))
+```
+
+As per the observation, only 60 and 63 has the lowest mean price and we can see a linear trend in the data which is exponentially growing. 
+
+
+# Engine Location and Price 
+
+There are two types of engine and out of which there are options link rare and front. when we compare the result we can see the visualization below
+```{r,echo=FALSE}
+df %>%  ggplot(aes(x= engine.location,y=price,fill=engine.location)) + geom_boxplot() +  xlab("Engine Location") + ylab("Price")+ ggtitle("Engine Location vs Price")
+```
+
+As per the above observation, it can be seen that rare engine vehicles fetch higher price than normal. 
+
+\newpage
+
+# Machine Learning 
+
+As per the above analysis the variable affecting the price have been found. The variables can be used for model building.
+
+## Data Preparation
+
+As most of the columns are not normally distributed. 
+
+There is a necessity for data preparation. there are many techniques to get the data to a normally distributed form. One such techniques to get the data to normally distribution is the 
+
+\ 
+
+#### Data Transformation
+
+There are multiple option to choose the data transformation. Out of which log transformation is one such technique which can reduce the skewness. 
+
+Along with it there is a necessary to  convert the column which are character to factor. 
+
+```{r,echo=FALSE}
+df$normalized.losses<- log(df$normalized.losses)
+df$wheel.base <- log(df$wheel.base)
+df$length <- log(df$length)
+df$width <- log(df$width)
+df$height <- log(df$height)
+df$curb.weight <- log(df$curb.weight)
+df$engine.size <- log(df$engine.size)
+df$bore <- log(df$bore)
+df$stroke <- log(df$stroke)
+df$compression.ratio <- log(df$compression.ratio)
+df$horsepower <- log(df$horsepower)
+df$peak.rpm <- log(df$peak.rpm)
+df$city.mpg <- log(df$city.mpg)
+df$highway.mpg <- log(df$highway.mpg)
+
+df<- df%>%mutate_if(is.character, as.factor)
+```
+
+Creating dummy variables / one hot encoding
+
+```{r,echo=FALSE}
+car_dummy <- dummyVars(" ~ .", data = df, fullRank = T)
+```
+
+#### Data Split
+
+The data has 205 rows and these rows will be split to 70:30 ratio. 
+
+```{r,echo=FALSE}
+df <- data.frame(predict(car_dummy, newdata = df))
+set.seed(123)
+Index <- sample(1:nrow(df),round(nrow(df)*.7),replace = FALSE)
+training <- df[Index,]
+testing <- df[-Index,]
+```
+
+
+### Modeling- Linear Regression
+
+\ 
+A linear model will be applied wherein the price is the y variable also known as the dependent variable. 
+
+All the variables are been considered for the model.
+
+```{r,echo=FALSE}
+lm_model <- lm(price~.,data = training)
+summary(lm_model)
+```
+As per the above observation, the variables like make, body style, engine location, width, height, engine type are significant. Moreover, The Adjusted R-squared is .93 which means 93 percent of the data fit the model.
+
+### Forward and Backward Linear Model Selection
+
+We can select forward and backward section model in the process using stepAIC. 
+```{r,echo=FALSE}
+lm_model_both <- stepAIC(lm_model,direction = "both")
+
+```
+Now the model is better than a linear model and the AIC is the lowest at 2198. The lower the AIC better the model. 
+
+### Random Forest Regression
+
+We can also use some hybrid model which can take regression or classification out of which random forest is one of the best
+
+```{r,echo=FALSE}
+randomforest_model <- randomForest(price~.,data = training,mtry = 3,ntree = 100)
+```
+
+We take trees as 100 and mtry(number of tries) as 3 to choose the better accuracy.
+
+## Model Performance Evaluvation
+
+Now the model will be predicted using the test data and the RMSE will be calculated which can be seen below
+
+```{r,echo=FALSE,warning=FALSE}
+model_predict_lm <- predict.lm(lm_model,newdata =testing)
+model_predict_both<-predict.lm(lm_model_both,newdata =testing)
+model_predict_randomForest <- predict(randomforest_model,newdata =testing)
+```
+
+\ 
+
+```{r}
+paste0("Linear Regression's RMSE",": ",RMSE(model_predict_lm,testing$price)) # Linear Regression
+paste0("Forward and Backwards selection model's RMSE:"," ",RMSE(model_predict_both,testing$price)) # Linear Regression with forward and backward selection model
+paste0("RandomForest's RMSE :"," ",RMSE(model_predict_randomForest,testing$price)) # Random Forest
+```
+
+\newpage
+
+# Conclusion 
+As per the model evaluation, it can be seen that the model which has the lowest RMSE is the best model. As per the observation, the random forest has the lowest RMSE followed by the linear model with the forward and backward selection model.  
+
+\newpage
+
+# Referenace
+
+1. Piotr Wójcik. Machine Learning 1: classification methods. Presentations from classes.
+2. Statistical Regression and Classification from Linear Models to Machine Learning. Norman Matloff · 2017
+3. Data: https://www.kaggle.com/toramky/automobile-dataset
+
+
